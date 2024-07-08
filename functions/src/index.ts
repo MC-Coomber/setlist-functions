@@ -8,18 +8,14 @@
  */
 
 import { initializeApp } from "firebase-admin/app";
-import { onDocumentCreatedWithAuthContext } from "firebase-functions/v2/firestore";
+import {
+  onDocumentCreatedWithAuthContext,
+  onDocumentDeleted,
+} from "firebase-functions/v2/firestore";
 
 import { error } from "firebase-functions/logger";
-import { onBandCreated } from "./on-band-created";
-
-// Start writing functions
-// https://firebase.google.com/docs/functions/typescript
-
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+import { createMembership } from "./create-membership";
+import { deleteBandMemberships } from "./delete-memberships";
 
 initializeApp();
 
@@ -27,9 +23,17 @@ exports.bandcreated = onDocumentCreatedWithAuthContext(
   "bands/{bandId}",
   async (event) => {
     if (event.data && event.authId) {
-      onBandCreated(event.authId, event.data.id);
+      createMembership(event.data.id, event.authId);
     } else {
       error("Data or auth ID is not defined");
     }
   }
 );
+
+exports.banddeleted = onDocumentDeleted("bands/{bandId}", async (event) => {
+  if (event.data) {
+    deleteBandMemberships(event.data.id);
+  } else {
+    error("Data or auth ID is not defined");
+  }
+});
