@@ -16,6 +16,7 @@ import {
 import { error } from "firebase-functions/logger";
 import { createMembership } from "./create-membership";
 import { deleteBandMemberships } from "./delete-memberships";
+import { getFirestore } from "firebase-admin/firestore";
 
 initializeApp();
 
@@ -37,3 +38,26 @@ exports.banddeleted = onDocumentDeleted("bands/{bandId}", async (event) => {
     error("Data or auth ID is not defined");
   }
 });
+
+exports.membershipdeleted = onDocumentDeleted(
+  "memberships/{membershipId}",
+  async (event) => {
+    if (event.data) {
+      const db = getFirestore();
+      const membership = event.data;
+      const bandId = membership.data()!.bandId;
+      const bandMemberships = await db
+        .collection("memberships")
+        .where("bandId", "==", bandId)
+        .get();
+      if (bandMemberships.size === 0) {
+        const band = await db.collection("bands").doc(bandId).get();
+        if (band.exists) {
+          await db.collection("bands").doc(bandId).delete();
+        }
+      }
+    } else {
+      error("Data or auth ID is not defined");
+    }
+  }
+);

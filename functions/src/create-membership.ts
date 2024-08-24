@@ -12,13 +12,7 @@ export async function createMembership(
   const membershipId = await collectionRef.add({
     musicianId: userId,
     bandId: bandId,
-    role: {
-      name: "founder",
-      permissions: {
-        canAddMembers: true,
-        canRemoveMembers: true,
-      },
-    },
+    roleId: "founder",
   });
 
   return membershipId.id;
