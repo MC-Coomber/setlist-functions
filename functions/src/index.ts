@@ -1,32 +1,41 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
 import { initializeApp } from "firebase-admin/app";
 import {
-  onDocumentCreatedWithAuthContext,
   onDocumentDeleted,
+  onDocumentUpdated,
 } from "firebase-functions/v2/firestore";
 
 import { error } from "firebase-functions/logger";
-import { createMembership } from "./create-membership";
 import { deleteBandMemberships } from "./delete-memberships";
 import { getFirestore } from "firebase-admin/firestore";
+import { getMembershipsByBandId, getMembershipsByMusicianId } from "./queries";
 
 initializeApp();
 
-exports.bandcreated = onDocumentCreatedWithAuthContext(
-  "bands/{bandId}",
+exports.bandupdated = onDocumentUpdated("bands/{bandId}", async (event) => {
+  if (event.data) {
+    const memberships = await getMembershipsByBandId(event.data.after.id);
+    memberships.docs.forEach((membership) => {
+      membership.ref.update({
+        bandName: event.data?.after.get("name"),
+      });
+    });
+  } else {
+    error("Data is not defined");
+  }
+});
+
+exports.musicianupdated = onDocumentUpdated(
+  "musicians/{musicianId}",
   async (event) => {
-    if (event.data && event.authId) {
-      createMembership(event.data.id, event.authId);
+    if (event.data) {
+      const memberships = await getMembershipsByMusicianId(event.data.after.id);
+      memberships.docs.forEach((membership) => {
+        membership.ref.update({
+          musicianName: event.data?.after.get("name"),
+        });
+      });
     } else {
-      error("Data or auth ID is not defined");
+      error("Data is not defined");
     }
   }
 );
@@ -46,10 +55,8 @@ exports.membershipdeleted = onDocumentDeleted(
       const db = getFirestore();
       const membership = event.data;
       const bandId = membership.data()!.bandId;
-      const bandMemberships = await db
-        .collection("memberships")
-        .where("bandId", "==", bandId)
-        .get();
+      const bandMemberships = await getMembershipsByBandId(bandId);
+
       if (bandMemberships.size === 0) {
         const band = await db.collection("bands").doc(bandId).get();
         if (band.exists) {
